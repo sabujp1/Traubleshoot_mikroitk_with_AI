@@ -363,33 +363,35 @@ curl http://localhost:3100/ready
 
 ---
 
-## 🔌 MikroTik AI CLI (Prompt Snapshot Tool)
+## 🛰️ MikroTik Universal Explorer (AI Tool)
 
-The `ai_cli.py` tool is designed to gather live data **and recent logs** from your router and format it into a perfect "snapshot" that you can paste into Claude, Gemini, or ChatGPT for analysis. **No AI API keys are required.**
+The `mikrotik_explorer.py` is a powerful, dynamic tool designed to be used by **Terminal-based AIs** (like Claude CLI, Gemini CLI, or even ChatGPT with local shell access). It can query **any** part of the MikroTik REST API.
 
-### Setup
+### Usage for AI Agents
 
-1. **Configure Environment Variables**:
-   ```bash
-   export MIKROTIK_HOST="192.168.88.1"
-   export MIKROTIK_USER="api-user"
-   export MIKROTIK_PASSWORD="StrongPassword123"
-   ```
+If you are using an AI in your terminal, you can tell it:
+> "Check the router for any BGP sessions that are not established using `mikrotik_explorer.py`."
 
-### Using the AI CLI
+The AI will then automatically run:
+```bash
+python3 mikrotik_explorer.py routing/bgp/connection
+```
 
-1. **Run the script** to get a live snapshot (Status + Logs):
-   ```bash
-   python3 ai_cli.py
-   ```
+### Manual Usage
 
-2. **Copy the output** and paste it into your preferred AI chat (Claude/Gemini/ChatGPT).
+You can also use it manually to find any data:
+```bash
+# List all IP addresses
+python3 mikrotik_explorer.py ip/address
 
-**What it captures**:
-- 📡 **Live Metrics**: Interfaces, BGP peers, and Route counts.
-- 📄 **Recent Logs**: The last 20 lines from your centralized syslog file.
+# List only running interfaces
+python3 mikrotik_explorer.py interface '{"running":"true"}'
 
-This gives the AI full context—both what the router *is* doing (metrics) and what it *says* is happening (logs).
+# Check system health (voltage, temp)
+python3 mikrotik_explorer.py system/health
+```
+
+This tool makes your router "discoverable" for any AI you run on your server!
 
 **Sample output:**
 ```
