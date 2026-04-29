@@ -9,20 +9,42 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: mikrotik_syslog
+  # Read syslog messages written to file by rsyslog
+  # rsyslog receives UDP from MikroTik on port 514/1514 and writes to this file
+  - job_name: mikrotik_syslog_file
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: "mikrotik_logs"
+          __path__: /var/log/mikrotik/*.log
+
+    pipeline_stages:
+      # MikroTik RFC3164 syslog line format written by rsyslog:
+      # <timestamp> <host> <app>: <message>
+      - regex:
+          expression: '^(?P<timestamp>\w+\s+\d+\s+[\d:]+)\s+(?P<host>\S+)\s+(?P<app>[^:]+):\s+(?P<message>.*)$'
+      - labels:
+          host:
+          app:
+      - timestamp:
+          source: timestamp
+          format: 'Jan _2 15:04:05'
+          location: UTC
+
+  # Keep the direct syslog listener as backup
+  - job_name: mikrotik_syslog_direct
     syslog:
-      listen_address: 0.0.0.0:1514
+      listen_address: 0.0.0.0:1515
       listen_protocol: udp
       idle_timeout: 60s
       label_structured_data: yes
-      # NOTE: 'format' field was removed in Promtail v2.8+ — do NOT add it back
       labels:
         job: "mikrotik_logs"
-
     relabel_configs:
       - source_labels: ['__syslog_message_hostname']
         target_label: 'host'
       - source_labels: ['__syslog_message_app_name']
-        target_label: 'module'
+        target_label: 'app'
       - source_labels: ['__syslog_message_severity']
         target_label: 'severity'

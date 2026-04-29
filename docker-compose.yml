@@ -6,7 +6,6 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      # Custom config: disables old-sample rejection (MikroTik timestamps may be old)
       - ./loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
@@ -24,10 +23,11 @@ services:
     container_name: promtail
     volumes:
       - ./promtail-config.yaml:/etc/promtail/config.yml
+      # Mount the rsyslog output directory into the container
+      - /var/log/mikrotik:/var/log/mikrotik:ro
     ports:
-      # Expose UDP 1514 for MikroTik syslog
       - "1514:1514/udp"
-      # Promtail web UI / metrics
+      - "1515:1515/udp"
       - "9080:9080"
     command: -config.file=/etc/promtail/config.yml
     depends_on:
@@ -45,7 +45,6 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      # Automatically provision Loki as a data source
       - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:
       - grafana_data:/var/lib/grafana
