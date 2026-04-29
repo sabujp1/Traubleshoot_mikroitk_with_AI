@@ -6,9 +6,9 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      # Use the built-in default config — no file mount needed
+      # Custom config: disables old-sample rejection (MikroTik timestamps may be old)
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
-    # The image ships with /etc/loki/local-config.yaml built-in
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - loki-net

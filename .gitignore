@@ -2,10 +2,6 @@
 loki-data/
 grafana-data/
 
-# loki-config.yaml is NOT mounted — Loki uses its built-in default config.
-# This file is kept locally for reference only.
-loki-config.yaml
-
 # Sensitive MikroTik router config export — NEVER commit this
 mikrotik_config_export.txt
 
