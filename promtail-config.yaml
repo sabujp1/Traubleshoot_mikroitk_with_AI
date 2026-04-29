@@ -15,41 +15,14 @@ scrape_configs:
       listen_protocol: udp
       idle_timeout: 60s
       label_structured_data: yes
-      # MikroTik sends BSD syslog (RFC3164)
       format: rfc3164
       labels:
         job: "mikrotik_logs"
 
     relabel_configs:
-      # Map the syslog hostname to a Loki label
       - source_labels: ['__syslog_message_hostname']
         target_label: 'host'
-      # Map the syslog app name (the MikroTik topic) to a Loki label
       - source_labels: ['__syslog_message_app_name']
         target_label: 'module'
-      # Map syslog severity to a Loki label
       - source_labels: ['__syslog_message_severity']
         target_label: 'severity'
-
-    pipeline_stages:
-      # MikroTik prepends "topic,subtopic " to each message body.
-      # This regex splits it into a `tags` capture group and the real content.
-      - regex:
-          expression: '^(?P<tags>[a-zA-Z0-9,_-]+) (?P<content>.+)$'
-      # Promote the extracted `tags` field as a Loki label for filtering
-      - labels:
-          tags:
-
-      # --- Firewall log enrichment ---
-      # Only run this stage on logs that contain the firewall topic
-      - match:
-          selector: '{job="mikrotik_logs"} |= "firewall"'
-          stages:
-            - regex:
-                # Matches: in:<iface> out:<iface> mac <mac> src-mac <mac> proto <proto> <src_ip>:<src_port>-><dst_ip>:<dst_port>
-                expression: 'in:(?P<in_iface>[^ ]+).*proto (?P<proto>[^ ,]+).*(?P<src_ip>\d+\.\d+\.\d+\.\d+):(?P<src_port>\d+)->(?P<dst_ip>\d+\.\d+\.\d+\.\d+):(?P<dst_port>\d+)'
-            - labels:
-                in_iface:
-                proto:
-                src_ip:
-                dst_ip:
