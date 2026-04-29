@@ -71,11 +71,11 @@
 ├── grafana-provisioning/
 │   └── datasources/
 │       └── loki.yaml                     # Auto-provisions Loki data source in Grafana
-├── mikrotik_explorer.py                 # Universal API explorer tool
-├── skill.md                             # AI "Instruction Manual" for the explorer
+├── mikrotik_log_fetcher.py              # Fetches logs from Loki for AI analysis
 ├── mikrotik_api_query.py                # Core API library for MikroTik REST API
+├── mikrotik_setup.md                     # Step-by-step router configuration guide
 ├── logql_queries.md                      # 30+ ready-to-use LogQL queries
-├── ai_troubleshooting_skills.md          # 7 AI prompt templates for diagnostics
+├── ai_troubleshooting_skills.md          # AI prompt templates for diagnostics
 ├── run.sh                                # One-command startup script with health check
 └── .gitignore                            # Excludes sensitive configs & runtime data
 ```
@@ -101,7 +101,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-> See `ubuntu_installation.md` for the full step-by-step guide.
+> 💡 **Note**: Docker installation is required on the host machine.
 
 ---
 
@@ -257,63 +257,32 @@ Click **Run query**. If log lines appear → ✅ **Everything is working.**
 
 ---
 
-## 🤖 AI Troubleshooting & Skills
+## 🤖 AI Troubleshooting Workflow
 
-The heart of this stack is **AI-assisted diagnostics**. Instead of searching through millions of log lines manually, you can use any terminal-based AI (Claude, Gemini, ChatGPT) to do it for you.
+There are two ways to use this stack with AI:
 
-### 📜 The AI Skill Manual (`skill.md`)
+### Method A: Automated (Best for AI Agents)
+If you are using an AI agent in your terminal (like Claude CLI, Gemini CLI, or Antigravity), you don't need to copy-paste. Just tell the AI:
+> "Fetch the last 50 logs using `mikrotik_log_fetcher.py` and analyze my BGP config."
 
-We have provided a **`skill.md`** file that contains all the instructions your AI needs to become a MikroTik expert. 
+The AI will run the script, read the output, and provide a diagnosis automatically.
 
-**To use it:**
-1. Start your AI CLI (e.g., `claude`, `gemini`, or `aichat`).
-2. Give it the first instruction: **"Read `skill.md` and use the tools there to help me."**
-3. Ask your question: *"Why is my BGP neighbor down?"* or *"Summarize the last 10 errors."*
+### Method B: Manual (Best for ChatGPT/Web)
+When using a web-based AI:
+1. **Identify** the problematic logs in Grafana.
+2. **Copy** the logs and your current router configuration.
+3. **Paste** them into the AI using one of the templates in `ai_troubleshooting_skills.md`.
+4. **Follow** the AI's step-by-step diagnostic and fix commands.
 
 ---
 
-## 🛰️ MikroTik Universal Explorer (AI Tool)
+## 🛠️ Automated Tools for AI
 
-The `mikrotik_explorer.py` tool is used by the AI to gather live facts from any part of the MikroTik REST API.
-
-### Usage for AI Agents
-
-If you are using an AI in your terminal, you can tell it:
-> "Check the router for any BGP sessions that are not established using `mikrotik_explorer.py`."
-
-### Manual Usage
-
-```bash
-# List only running interfaces
-python3 mikrotik_explorer.py interface '{"running":"true"}'
-
-# Check system health (voltage, temp)
-python3 mikrotik_explorer.py system/health
-```
-
-**Sample output:**
-```
-Connecting to MikroTik router at [ROUTER_IP]...
-
---- MikroTik Router Status ---
-Running Interfaces : 6
-BGP Peers          : 4
-BGP Routes         : 15830
-------------------------------
-```
-BGP Routes         : 15830
-------------------------------
-```
-
-### What the Script Queries
-
-| Metric | REST Endpoint | Description |
+| Tool | Purpose | Usage |
 |---|---|---|
-| Running Interfaces | `GET /rest/interface?running=true` | Count of interfaces currently UP |
-| BGP Peers | `GET /rest/routing/bgp/connection` | Configured BGP sessions |
-| BGP Routes | `GET /rest/routing/route?bgp=true` | Routes learned via BGP |
+| `mikrotik_log_fetcher.py` | Fetches live logs from Loki | `python3 mikrotik_log_fetcher.py --limit 50` |
+| `mikrotik_api_query.py` | Queries live router metrics (BGP, Int) | `python3 mikrotik_api_query.py --host <IP>` |
 
----
 
 ## 📊 LogQL Query Reference
 
@@ -386,19 +355,7 @@ rate({job="mikrotik_logs"} |= "bgp" [1h])
 
 ---
 
-## 🤖 AI Troubleshooting Workflow
-
-When you spot an issue in Grafana, use this 4-step workflow:
-
-**Step 1** — Copy the relevant log lines from Grafana Explore
-
-**Step 2** — Export your router config:
-```routeros
-/export file=config
-# Then download from Files menu in Winbox
-```
-
-**Step 3** — Paste both into an AI assistant using a prompt template:
+### Example Prompt
 
 ```
 I am a network engineer managing MikroTik routers.
@@ -414,8 +371,6 @@ Please:
 2. Explain why it's happening
 3. Provide the exact RouterOS commands to fix it
 ```
-
-**Step 4** — See `ai_troubleshooting_skills.md` for topic-specific templates (BGP flapping, firewall drops, PPPoE auth failures).
 
 ---
 
@@ -438,66 +393,6 @@ Please:
 - [ ] Multi-router per-device dashboards
 - [ ] Automatic BGP flap detection with alerting
 - [ ] PPPoE session tracking panel
-
----
-
-## 🔀 Git — Push & Deploy
-
-### First time setup (from your local machine)
-
-```bash
-cd path/to/loki
-
-# Stage all updated files
-git add \
-  docker-compose.yml \
-  promtail-config.yaml \
-  grafana-provisioning/ \
-  mikrotik_setup.md \
-  mikrotik_api_query.py \
-  logql_queries.md \
-  ai_troubleshooting_skills.md \
-  run.sh \
-  README.md \
-  .gitignore
-
-# Commit
-git commit -m "fix: correct syslog pipeline, add REST API query script, update all docs"
-
-# Push
-git push origin main
-```
-
-### Pull and redeploy on the server
-
-```bash
-ssh root@<SERVER_IP>
-cd ~/Traubleshoot_mikroitk_with_AI
-
-git pull
-
-# Restart the stack to apply any config changes
-docker compose down
-docker compose up -d
-
-# Verify
-docker ps
-curl http://localhost:3100/ready
-```
-
-### What is committed vs ignored
-
-| File | Committed | Reason |
-|---|---|---|
-| `docker-compose.yml` | ✅ Yes | Core infrastructure definition |
-| `promtail-config.yaml` | ✅ Yes | Syslog parsing config |
-| `grafana-provisioning/` | ✅ Yes | Auto-provisions Loki in Grafana |
-| `mikrotik_api_query.py` | ✅ Yes | REST API query script |
-| `*.md` docs | ✅ Yes | Documentation |
-| `run.sh` | ✅ Yes | Startup script |
-| `loki-config.yaml` | ❌ No | Loki uses built-in default — not needed on server |
-| `mikrotik_config_export.txt` | ❌ No | **Contains sensitive router config** |
-| `loki-data/`, `grafana-data/` | ❌ No | Runtime Docker volumes — not needed in git |
 
 ---
 
