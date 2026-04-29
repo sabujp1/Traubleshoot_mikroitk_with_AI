@@ -1,0 +1,14 @@
+# Docker data
+loki-data/
+grafana-data/
+
+# Sensitive MikroTik data
+mikrotik_config_export.txt
+
+# Temp files
+*.log
+positions.yaml
+
+# OS files
+.DS_Store
+Thumbs.db

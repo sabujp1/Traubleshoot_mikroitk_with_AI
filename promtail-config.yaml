@@ -1,0 +1,49 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: mikrotik_syslog
+    syslog:
+      listen_address: 0.0.0.0:1514
+      idle_timeout: 60s
+      label_structured_data: yes
+      labels:
+        job: "mikrotik_logs"
+    relabel_configs:
+      - source_labels: ['__syslog_message_hostname']
+        target_label: 'host'
+      - source_labels: ['__syslog_message_app_name']
+        target_label: 'module'
+      - source_labels: ['__syslog_message_severity']
+        target_label: 'level'
+      - source_labels: ['__syslog_message_facility']
+        target_label: 'facility'
+
+    pipeline_stages:
+      - match:
+          selector: '{job="mikrotik_logs"}'
+          stages:
+            - regex:
+                # Example MikroTik Log: "ovpn,debug,pptp,info message content"
+                expression: '^(?P<tags>[^ ]+) (?P<content>.*)$'
+            - labels:
+                tags:
+            # Further parsing for firewall logs if they have specific patterns
+            - match:
+                selector: '{tags=~".*firewall.*"}'
+                stages:
+                  - regex:
+                      expression: '(?P<action>drop|accept|reject) (?P<chain>input|forward|output) (?P<interface_in>[^ ]+) (?P<interface_out>[^ ]+) proto (?P<proto>[^ ]+), (?P<src_ip>[^:]+):(?P<src_port>\d+)->(?P<dst_ip>[^:]+):(?P<dst_port>\d+)'
+                  - labels:
+                      action:
+                      chain:
+                      src_ip:
+                      dst_ip:
+                      proto:
