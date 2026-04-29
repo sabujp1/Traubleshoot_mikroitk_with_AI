@@ -141,6 +141,18 @@ docker compose up -d
 docker ps
 ```
 
+### Step 5 — Configure MikroTik Credentials
+
+Set your router details as environment variables so the AI tools can access them:
+
+```bash
+export MIKROTIK_HOST="[YOUR_ROUTER_IP]"
+export MIKROTIK_USER="admin"
+export MIKROTIK_PASSWORD="yourpassword"
+```
+
+> 💡 **Tip**: Add these to your `~/.bashrc` to make them permanent.
+
 All three containers must show `Up` or `Up (healthy)`:
 
 ```
