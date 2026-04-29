@@ -9,42 +9,19 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # Read syslog messages written to file by rsyslog
-  # rsyslog receives UDP from MikroTik on port 514/1514 and writes to this file
-  - job_name: mikrotik_syslog_file
+  - job_name: mikrotik_syslog
     static_configs:
       - targets:
           - localhost
         labels:
           job: "mikrotik_logs"
-          __path__: /var/log/mikrotik/*.log
+          __path__: /var/log/mikrotik/routers.log
 
     pipeline_stages:
-      # MikroTik RFC3164 syslog line format written by rsyslog:
-      # <timestamp> <host> <app>: <message>
+      # Parse the rsyslog-written line:
+      # "Apr 29 17:25:00 103.159.188.61 bgp-peer-1: {l_addr: ...} message"
       - regex:
-          expression: '^(?P<timestamp>\w+\s+\d+\s+[\d:]+)\s+(?P<host>\S+)\s+(?P<app>[^:]+):\s+(?P<message>.*)$'
+          expression: '^(?P<ts>\w{3}\s+\d+\s+[\d:]+)\s+(?P<host>\S+)\s+(?P<app>[^:]+):\s*(?P<message>.+)$'
       - labels:
           host:
           app:
-      - timestamp:
-          source: timestamp
-          format: 'Jan _2 15:04:05'
-          location: UTC
-
-  # Keep the direct syslog listener as backup
-  - job_name: mikrotik_syslog_direct
-    syslog:
-      listen_address: 0.0.0.0:1515
-      listen_protocol: udp
-      idle_timeout: 60s
-      label_structured_data: yes
-      labels:
-        job: "mikrotik_logs"
-    relabel_configs:
-      - source_labels: ['__syslog_message_hostname']
-        target_label: 'host'
-      - source_labels: ['__syslog_message_app_name']
-        target_label: 'app'
-      - source_labels: ['__syslog_message_severity']
-        target_label: 'severity'
