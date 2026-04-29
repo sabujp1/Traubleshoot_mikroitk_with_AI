@@ -74,11 +74,11 @@
 │   └── datasources/
 │       └── loki.yaml                     # Auto-provisions Loki data source in Grafana
 ├── mikrotik_setup.md                     # RouterOS CLI commands (syslog + REST API)
-├── mikrotik_api_query.py                 # Python — query router live via REST API
+├── ai_cli.py                             # NEW: AI-style CLI for router status queries
+├── mikrotik_api_query.py                 # Core API library for MikroTik REST API
 ├── logql_queries.md                      # 30+ ready-to-use LogQL queries
 ├── ai_troubleshooting_skills.md          # 7 AI prompt templates for diagnostics
 ├── run.sh                                # One-command startup script with health check
-├── ubuntu_installation.md               # Docker setup guide for Ubuntu
 └── .gitignore                            # Excludes sensitive configs & runtime data
 ```
 
@@ -351,8 +351,6 @@ sleep 15
 curl http://localhost:3100/ready
 ```
 
----
-
 ### Quick Diagnostic Summary Table
 
 | Symptom | Most Likely Cause | Fix |
@@ -360,40 +358,38 @@ curl http://localhost:3100/ready
 | Container `loki` keeps restarting | Config file mount issue | Remove custom config mount, use built-in |
 | No packets in `tcpdump` | Firewall or wrong IP/port on router | Check UFW + MikroTik action `remote` and `remote-port` |
 | Packets arrive but nothing in Loki | `bsd-syslog=yes` missing | Set `bsd-syslog=yes` on MikroTik logging action |
-| Promtail `error` in logs | YAML indentation bug in config | Validate `promtail-config.yaml` with `docker run --rm -v $(pwd)/promtail-config.yaml:/etc/promtail/config.yml grafana/promtail:3.0.0 --config.file=/etc/promtail/config.yml --check-syntax` |
+| Promtail `error` in logs | YAML indentation bug in config | Validate `promtail-config.yaml` |
 | Grafana shows "Data source error" | Wrong Loki URL | Use `http://loki:3100` (Docker network name) |
 
 ---
 
-## 🔌 MikroTik REST API Queries
+## 🔌 MikroTik AI CLI (Prompt Snapshot Tool)
 
-Query live data directly from your router using the included Python script.
-Requires **RouterOS v7.1+**.
+The `ai_cli.py` tool is designed to gather live data **and recent logs** from your router and format it into a perfect "snapshot" that you can paste into Claude, Gemini, or ChatGPT for analysis. **No AI API keys are required.**
 
-### Enable REST API on the Router
+### Setup
 
-```routeros
-# Enable HTTP web service (REST API activates automatically)
-/ip service set www disabled=no port=80
+1. **Configure Environment Variables**:
+   ```bash
+   export MIKROTIK_HOST="192.168.88.1"
+   export MIKROTIK_USER="api-user"
+   export MIKROTIK_PASSWORD="StrongPassword123"
+   ```
 
-# Create a read-only API user (do NOT use admin for this)
-/user group add name=api-readonly policy=read,api,rest-api
-/user add name=api-user group=api-readonly password=StrongPassword123
-```
+### Using the AI CLI
 
-### Run the Query Script
+1. **Run the script** to get a live snapshot (Status + Logs):
+   ```bash
+   python3 ai_cli.py
+   ```
 
-```bash
-# Install the Python dependency
-pip install requests
+2. **Copy the output** and paste it into your preferred AI chat (Claude/Gemini/ChatGPT).
 
-# Run — replace with your router's IP
-python mikrotik_api_query.py \
-    --host 192.168.88.1 \
-    --user api-user \
-    --password StrongPassword123 \
-    --no-ssl
-```
+**What it captures**:
+- 📡 **Live Metrics**: Interfaces, BGP peers, and Route counts.
+- 📄 **Recent Logs**: The last 20 lines from your centralized syslog file.
+
+This gives the AI full context—both what the router *is* doing (metrics) and what it *says* is happening (logs).
 
 **Sample output:**
 ```
