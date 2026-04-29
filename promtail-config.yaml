@@ -15,7 +15,7 @@ scrape_configs:
       listen_protocol: udp
       idle_timeout: 60s
       label_structured_data: yes
-      format: rfc3164
+      # NOTE: 'format' field was removed in Promtail v2.8+ — do NOT add it back
       labels:
         job: "mikrotik_logs"
 
