@@ -1,27 +1,90 @@
 #!/bin/bash
+set -e
 
-# Simple script to start the MikroTik Logging Stack on Ubuntu
+# ─────────────────────────────────────────────────────────────────────────────
+# MikroTik Logging Stack — Startup Script
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Check if Docker is installed
-if ! [ -x "$(command -v docker)" ]; then
-  echo 'Error: docker is not installed. Please follow the instructions in ubuntu_installation.md first.' >&2
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+echo -e "${CYAN}"
+echo "  ╔══════════════════════════════════════════════════╗"
+echo "  ║   MikroTik Logging Stack (Loki + Promtail)       ║"
+echo "  ╚══════════════════════════════════════════════════╝"
+echo -e "${NC}"
+
+# ── Check Docker ─────────────────────────────────────────────────────────────
+if ! command -v docker &> /dev/null; then
+  echo -e "${RED}✗ Docker is not installed.${NC}"
+  echo "  Run: curl -fsSL https://get.docker.com | sh"
+  echo "  Then see ubuntu_installation.md for full setup."
   exit 1
 fi
+echo -e "${GREEN}✓ Docker is available${NC}"
 
-# Ensure firewall port for Syslog is open
-echo "Ensuring UDP port 1514 is open in UFW..."
-sudo ufw allow 1514/udp > /dev/null
+# ── Check Docker Compose ──────────────────────────────────────────────────────
+if ! docker compose version &> /dev/null; then
+  echo -e "${RED}✗ Docker Compose v2 not found.${NC}"
+  echo "  Run: sudo apt install docker-compose-plugin"
+  exit 1
+fi
+echo -e "${GREEN}✓ Docker Compose is available${NC}"
 
-# Start the stack
-echo "Starting Loki, Promtail, and Grafana..."
+# ── Open firewall port ────────────────────────────────────────────────────────
+if command -v ufw &> /dev/null; then
+  echo -e "${YELLOW}→ Opening UDP port 1514 (MikroTik syslog)...${NC}"
+  sudo ufw allow 1514/udp > /dev/null 2>&1 || true
+  echo -e "${GREEN}✓ UFW rule applied${NC}"
+fi
+
+# ── Start containers ──────────────────────────────────────────────────────────
+echo ""
+echo -e "${YELLOW}→ Starting Loki, Promtail, and Grafana...${NC}"
 docker compose up -d
 
-echo "------------------------------------------------"
-echo "Stack is running!"
-echo "Grafana: http://localhost:3000"
-echo "Loki API: http://localhost:3100/ready"
-echo "Promtail Syslog: Listening on UDP/1514"
-echo "------------------------------------------------"
-echo "Next steps:"
-echo "1. Configure your MikroTik router (see mikrotik_setup.md)"
-echo "2. Add Loki as a datasource in Grafana (URL: http://loki:3100)"
+# ── Wait for Loki to be healthy ───────────────────────────────────────────────
+echo ""
+echo -e "${YELLOW}→ Waiting for Loki to be ready...${NC}"
+RETRIES=15
+until curl -s http://localhost:3100/ready | grep -q "ready" || [ $RETRIES -eq 0 ]; do
+  echo -n "."
+  sleep 2
+  RETRIES=$((RETRIES-1))
+done
+echo ""
+
+if curl -s http://localhost:3100/ready | grep -q "ready"; then
+  echo -e "${GREEN}✓ Loki is ready${NC}"
+else
+  echo -e "${RED}✗ Loki did not become ready in time. Check: docker logs loki${NC}"
+fi
+
+# ── Print summary ─────────────────────────────────────────────────────────────
+SERVER_IP=$(hostname -I | awk '{print $1}')
+echo ""
+echo -e "${CYAN}────────────────────────────────────────────────────${NC}"
+echo -e "${GREEN}  Stack is running! Access your services:${NC}"
+echo ""
+echo -e "  📊 Grafana        : ${CYAN}http://${SERVER_IP}:3000${NC}  (admin / admin)"
+echo -e "  💾 Loki API       : ${CYAN}http://${SERVER_IP}:3100/ready${NC}"
+echo -e "  📡 Syslog Listener: ${CYAN}UDP ${SERVER_IP}:1514${NC}"
+echo -e "  📈 Promtail UI    : ${CYAN}http://${SERVER_IP}:9080${NC}"
+echo -e "${CYAN}────────────────────────────────────────────────────${NC}"
+echo ""
+echo -e "${YELLOW}  Next steps:${NC}"
+echo "  1. Configure your MikroTik router — see: mikrotik_setup.md"
+echo "     Key command:"
+echo "     /system logging action add name=loki-promtail target=remote \\"
+echo "       remote=${SERVER_IP} remote-port=1514 bsd-syslog=yes"
+echo ""
+echo "  2. Open Grafana and go to Explore → Loki"
+echo "     Query: {job=\"mikrotik_logs\"}"
+echo ""
+echo "  3. If no logs appear, run this to debug:"
+echo "     sudo tcpdump -i any udp port 1514 -n"
+echo "     docker logs promtail -f"
+echo ""
