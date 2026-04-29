@@ -12,12 +12,10 @@
 4. [Quick Deployment](#-quick-deployment)
 5. [Configure MikroTik Router](#-configure-mikrotik-router)
 6. [Verify Logs in Grafana](#-verify-logs-in-grafana)
-7. [Troubleshooting — Logs Not Arriving](#-troubleshooting--logs-not-arriving)
-8. [MikroTik REST API Queries](#-mikrotik-rest-api-queries)
-9. [LogQL Query Reference](#-logql-query-reference)
-10. [AI Troubleshooting Workflow](#-ai-troubleshooting-workflow)
-11. [Security](#-security)
-12. [Roadmap](#️-roadmap)
+7. [AI Troubleshooting & Skills](#-ai-troubleshooting--skills)
+8. [LogQL Query Reference](#-logql-query-reference)
+9. [Security](#-security)
+10. [Roadmap](#️-roadmap)
 
 ---
 
@@ -247,151 +245,39 @@ Click **Run query**. If log lines appear → ✅ **Everything is working.**
 
 ---
 
-## 🔍 Troubleshooting — Logs Not Arriving
+## 🤖 AI Troubleshooting & Skills
 
-Work through these checks **in order**. Each step isolates exactly where the pipeline is broken.
+The heart of this stack is **AI-assisted diagnostics**. Instead of searching through millions of log lines manually, you can use any terminal-based AI (Claude, Gemini, ChatGPT) to do it for you.
 
----
+### 📜 The AI Skill Manual (`skill.md`)
 
-### Check 1 — Are all containers running?
+We have provided a **`skill.md`** file that contains all the instructions your AI needs to become a MikroTik expert. 
 
-```bash
-docker ps
-```
-
-All three (`loki`, `promtail`, `grafana`) must be `Up`. If any are `Exited`:
-```bash
-docker logs <container_name>
-```
-
----
-
-### Check 2 — Is the server firewall open?
-
-```bash
-sudo ufw status | grep 1514
-```
-
-If port 1514 is not listed as `ALLOW`:
-```bash
-sudo ufw allow 1514/udp
-sudo ufw reload
-```
-
----
-
-### Check 3 — Are UDP packets arriving at the server?
-
-Run this on the server **while MikroTik is active**:
-
-```bash
-sudo tcpdump -i any udp port 1514 -n -vv
-```
-
-- ✅ **Packets appear** → Network path is fine → Check 4
-- ❌ **No packets** → Problem is between router and server (routing, firewall, wrong IP/port)
-
----
-
-### Check 4 — Is Promtail receiving and forwarding logs?
-
-```bash
-docker logs promtail -f
-```
-
-Look for:
-- ✅ `msg="Listening on address" address=0.0.0.0:1514` → bound correctly
-- ✅ `msg="successfully sent"` → logs reaching Loki
-- ❌ `level=error` → read the message carefully for the fix
-
-Check Promtail metrics (non-zero = receiving logs):
-```bash
-curl -s http://localhost:9080/metrics | grep syslog_messages_total
-```
-
----
-
-### Check 5 — Has Loki received any logs?
-
-```bash
-# Should list labels including "job" if logs have arrived
-curl -s http://localhost:3100/loki/api/v1/labels | python3 -m json.tool
-```
-
-Also check Loki logs:
-```bash
-docker logs loki -f
-```
-
----
-
-### Check 6 — Verify MikroTik action has the two critical flags
-
-```routeros
-/system logging action print where name=loki-promtail
-```
-
-Confirm these two values:
-- `bsd-syslog: yes` ← **If `no`, logs cannot be parsed**
-- `remote-port: 1514` ← **If `514`, logs go to the wrong port**
-
-Fix if needed:
-```routeros
-/system logging action set [find name=loki-promtail] bsd-syslog=yes remote-port=1514
-```
-
----
-
-### Check 7 — Restart after any config changes
-
-```bash
-docker compose down
-docker compose up -d
-sleep 15
-curl http://localhost:3100/ready
-```
-
-### Quick Diagnostic Summary Table
-
-| Symptom | Most Likely Cause | Fix |
-|---|---|---|
-| Container `loki` keeps restarting | Config file mount issue | Remove custom config mount, use built-in |
-| No packets in `tcpdump` | Firewall or wrong IP/port on router | Check UFW + MikroTik action `remote` and `remote-port` |
-| Packets arrive but nothing in Loki | `bsd-syslog=yes` missing | Set `bsd-syslog=yes` on MikroTik logging action |
-| Promtail `error` in logs | YAML indentation bug in config | Validate `promtail-config.yaml` |
-| Grafana shows "Data source error" | Wrong Loki URL | Use `http://loki:3100` (Docker network name) |
+**To use it:**
+1. Start your AI CLI (e.g., `claude`, `gemini`, or `aichat`).
+2. Give it the first instruction: **"Read `skill.md` and use the tools there to help me."**
+3. Ask your question: *"Why is my BGP neighbor down?"* or *"Summarize the last 10 errors."*
 
 ---
 
 ## 🛰️ MikroTik Universal Explorer (AI Tool)
 
-The `mikrotik_explorer.py` is a powerful, dynamic tool designed to be used by **Terminal-based AIs** (like Claude CLI, Gemini CLI, or even ChatGPT with local shell access). It can query **any** part of the MikroTik REST API.
+The `mikrotik_explorer.py` tool is used by the AI to gather live facts from any part of the MikroTik REST API.
 
 ### Usage for AI Agents
 
 If you are using an AI in your terminal, you can tell it:
 > "Check the router for any BGP sessions that are not established using `mikrotik_explorer.py`."
 
-The AI will then automatically run:
-```bash
-python3 mikrotik_explorer.py routing/bgp/connection
-```
-
 ### Manual Usage
 
-You can also use it manually to find any data:
 ```bash
-# List all IP addresses
-python3 mikrotik_explorer.py ip/address
-
 # List only running interfaces
 python3 mikrotik_explorer.py interface '{"running":"true"}'
 
 # Check system health (voltage, temp)
 python3 mikrotik_explorer.py system/health
 ```
-
-This tool makes your router "discoverable" for any AI you run on your server!
 
 **Sample output:**
 ```
@@ -400,6 +286,9 @@ Connecting to MikroTik router at [ROUTER_IP]...
 --- MikroTik Router Status ---
 Running Interfaces : 6
 BGP Peers          : 4
+BGP Routes         : 15830
+------------------------------
+```
 BGP Routes         : 15830
 ------------------------------
 ```
