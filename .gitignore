@@ -1,13 +1,21 @@
-# Docker data
+# Docker named volume data (auto-created by Docker, not needed in git)
 loki-data/
 grafana-data/
 
-# Sensitive MikroTik data
+# loki-config.yaml is NOT mounted — Loki uses its built-in default config.
+# This file is kept locally for reference only.
+loki-config.yaml
+
+# Sensitive MikroTik router config export — NEVER commit this
 mikrotik_config_export.txt
 
-# Temp files
+# Temp / runtime files
 *.log
 positions.yaml
+__pycache__/
+*.pyc
+*.pyo
+.env
 
 # OS files
 .DS_Store

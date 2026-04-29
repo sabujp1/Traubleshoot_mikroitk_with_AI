@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
 
   loki:
@@ -8,8 +6,9 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      - ./loki-config.yaml:/etc/loki/local-config.yaml
+      # Use the built-in default config — no file mount needed
       - loki_data:/loki
+    # The image ships with /etc/loki/local-config.yaml built-in
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - loki-net

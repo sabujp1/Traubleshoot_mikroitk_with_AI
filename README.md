@@ -1,48 +1,66 @@
 # 🚀 MikroTik Centralized Logging & AI Troubleshooting Stack
 
-> **Production-ready** log collection, storage, visualization, and AI-assisted troubleshooting for MikroTik RouterOS networks.
+> **Production-ready** centralized log collection, storage, visualization, and AI-assisted troubleshooting for MikroTik RouterOS networks — powered by **Promtail + Loki + Grafana**, fully containerized with Docker.
 
 ---
 
 ## 📋 Table of Contents
 
-1. [Architecture](#architecture)
-2. [Project Structure](#project-structure)
-3. [Prerequisites](#prerequisites)
-4. [Deployment](#deployment)
-5. [Configure MikroTik Router](#configure-mikrotik-router)
-6. [Verify Logs in Grafana](#verify-logs-in-grafana)
-7. [Troubleshooting Logs Not Arriving](#troubleshooting-logs-not-arriving)
-8. [MikroTik REST API Queries](#mikrotik-rest-api-queries)
-9. [LogQL Query Reference](#logql-query-reference)
-10. [AI Troubleshooting Workflow](#ai-troubleshooting-workflow)
-11. [Security](#security)
+1. [Architecture](#-architecture)
+2. [Project Structure](#-project-structure)
+3. [Prerequisites](#-prerequisites)
+4. [Quick Deployment](#-quick-deployment)
+5. [Configure MikroTik Router](#-configure-mikrotik-router)
+6. [Verify Logs in Grafana](#-verify-logs-in-grafana)
+7. [Troubleshooting — Logs Not Arriving](#-troubleshooting--logs-not-arriving)
+8. [MikroTik REST API Queries](#-mikrotik-rest-api-queries)
+9. [LogQL Query Reference](#-logql-query-reference)
+10. [AI Troubleshooting Workflow](#-ai-troubleshooting-workflow)
+11. [Security](#-security)
+12. [Roadmap](#️-roadmap)
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-MikroTik Router(s)
-  │  Syslog UDP → port 1514
-  ▼
-Promtail (port 9080 / UDP 1514)
-  │  Parse + Label + Forward
-  ▼
-Loki (port 3100)
-  │  Store & Index
-  ▼
-Grafana (port 3000)
-  │  Visualize & Alert
-  ▼
-AI (ChatGPT / Claude) — Paste logs for root-cause analysis
+┌─────────────────────────────────────────────────────────┐
+│                 MikroTik Router(s)                       │
+│           BSD Syslog / RFC3164 over UDP                  │
+└────────────────────────┬────────────────────────────────┘
+                         │  UDP → Port 1514
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│                     Promtail                             │
+│   • Listens on UDP/1514 for syslog                       │
+│   • Parses RFC3164 format                                │
+│   • Adds labels: host, module, severity, tags            │
+│   • Forwards to Loki via HTTP                            │
+│                     Port 9080 (metrics/UI)               │
+└────────────────────────┬────────────────────────────────┘
+                         │  HTTP push
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│                       Loki                               │
+│   • Stores and indexes log streams                       │
+│   • Queryable via LogQL                                  │
+│                     Port 3100                            │
+└────────────────────────┬────────────────────────────────┘
+                         │  LogQL queries
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│                     Grafana                              │
+│   • Dashboards, Explore, Alerting                        │
+│   • Loki auto-provisioned as data source                 │
+│                     Port 3000                            │
+└─────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+               🤖 AI Assistant (ChatGPT / Claude)
+               Paste logs for root-cause analysis
 ```
 
-**Data Flow:**
-1. MikroTik sends BSD Syslog (RFC3164) over **UDP to port 1514**
-2. Promtail receives, parses, and labels each log entry
-3. Loki stores logs indexed by labels (`host`, `module`, `severity`, `tags`)
-4. Grafana queries Loki using LogQL to display dashboards and alerts
+**All services run in Docker on the same host, connected via an internal `loki-net` bridge network.**
 
 ---
 
@@ -50,43 +68,46 @@ AI (ChatGPT / Claude) — Paste logs for root-cause analysis
 
 ```
 .
-├── docker-compose.yml              # Orchestrates Loki + Promtail + Grafana
-├── loki-config.yaml                # Loki storage & ingestion configuration
-├── promtail-config.yaml            # Promtail syslog listener & parsing rules
+├── docker-compose.yml                    # Orchestrates Loki + Promtail + Grafana
+├── promtail-config.yaml                  # Syslog UDP listener & RFC3164 parsing rules
 ├── grafana-provisioning/
 │   └── datasources/
-│       └── loki.yaml               # Auto-provisions Loki in Grafana on startup
-├── mikrotik_setup.md               # RouterOS CLI commands (syslog + REST API)
-├── mikrotik_api_query.py           # Python script to query router via REST API
-├── logql_queries.md                # Ready-to-use LogQL queries
-├── ai_troubleshooting_skills.md    # AI prompt templates for diagnostics
-├── run.sh                          # One-command startup script
-└── ubuntu_installation.md          # Docker setup on Ubuntu
+│       └── loki.yaml                     # Auto-provisions Loki data source in Grafana
+├── mikrotik_setup.md                     # RouterOS CLI commands (syslog + REST API)
+├── mikrotik_api_query.py                 # Python — query router live via REST API
+├── logql_queries.md                      # 30+ ready-to-use LogQL queries
+├── ai_troubleshooting_skills.md          # 7 AI prompt templates for diagnostics
+├── run.sh                                # One-command startup script with health check
+├── ubuntu_installation.md               # Docker setup guide for Ubuntu
+└── .gitignore                            # Excludes sensitive configs & runtime data
 ```
+
+> ℹ️ **`loki-config.yaml` is intentionally excluded from git** (via `.gitignore`). The Loki 3.0.0 image ships with a working built-in config at `/etc/loki/local-config.yaml`. Mounting a custom file caused startup failures on fresh server clones because the file didn't exist yet.
 
 ---
 
 ## ✅ Prerequisites
 
-| Requirement | Notes |
-|---|---|
-| Ubuntu 20.04+ server | The machine that will receive logs |
-| Docker Engine | `docker -v` to check |
-| Docker Compose v2+ | `docker compose version` to check |
-| MikroTik RouterOS v6.x or v7.x | Any model that supports remote syslog |
-| Network reachability | Router must be able to reach server on **UDP/1514** |
+| Requirement | Version | Check |
+|---|---|---|
+| Ubuntu Server | 20.04+ | `lsb_release -a` |
+| Docker Engine | 24+ | `docker -v` |
+| Docker Compose | v2+ (plugin) | `docker compose version` |
+| MikroTik RouterOS | v6.x or v7.x | Any model with remote syslog support |
+| Network path | UDP/1514 open | Router must reach server on UDP port 1514 |
 
-Install Docker on Ubuntu:
+### Install Docker on Ubuntu
 ```bash
-# See ubuntu_installation.md for the full guide
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
+> See `ubuntu_installation.md` for the full step-by-step guide.
+
 ---
 
-## 🚀 Deployment
+## 🚀 Quick Deployment
 
 ### Step 1 — Clone the Repository
 
@@ -95,47 +116,58 @@ git clone https://github.com/sabujp1/Traubleshoot_mikroitk_with_AI.git
 cd Traubleshoot_mikroitk_with_AI
 ```
 
-### Step 2 — Start the Stack
+### Step 2 — Open the Firewall
 
 ```bash
-# Quick start (recommended)
-chmod +x run.sh && ./run.sh
+sudo ufw allow 1514/udp   # MikroTik syslog
+sudo ufw allow 3000/tcp   # Grafana UI
+sudo ufw allow 3100/tcp   # Loki API (optional, internal use)
+sudo ufw reload
+```
 
-# Or manually
+### Step 3 — Start the Stack
+
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+Or manually:
+```bash
 docker compose up -d
 ```
 
-### Step 3 — Confirm All Containers Are Running
+### Step 4 — Confirm All Containers Are Healthy
 
 ```bash
 docker ps
 ```
 
-Expected output — all three containers should show `Up` status:
+All three containers must show `Up` or `Up (healthy)`:
 
 ```
-CONTAINER ID   IMAGE                    STATUS          PORTS
-xxxxxxxxxxxx   grafana/grafana:latest   Up (healthy)    0.0.0.0:3000->3000/tcp
-xxxxxxxxxxxx   grafana/promtail:3.0.0   Up              0.0.0.0:1514->1514/udp, 0.0.0.0:9080->9080/tcp
-xxxxxxxxxxxx   grafana/loki:3.0.0       Up (healthy)    0.0.0.0:3100->3100/tcp
+CONTAINER ID   IMAGE                    STATUS              PORTS
+xxxxxxxxxxxx   grafana/grafana:latest   Up                  0.0.0.0:3000->3000/tcp
+xxxxxxxxxxxx   grafana/promtail:3.0.0   Up                  0.0.0.0:1514->1514/udp, 0.0.0.0:9080->9080/tcp
+xxxxxxxxxxxx   grafana/loki:3.0.0       Up (healthy)        0.0.0.0:3100->3100/tcp
 ```
 
-### Step 4 — Verify Loki is Ready
+### Step 5 — Verify Loki is Ready
 
 ```bash
 curl http://localhost:3100/ready
-# Expected: ready
+# Expected response: ready
 ```
 
 ---
 
 ## 🔧 Configure MikroTik Router
 
-> ⚠️ **This is the most common reason logs don't arrive.** Follow these steps exactly.
+> ⚠️ **This is the #1 reason logs don't arrive.** Follow these commands exactly — two flags are critical: `bsd-syslog=yes` and `remote-port=1514`.
+
+Connect to your MikroTik via **Winbox Terminal** or **SSH**, then run:
 
 ### Step 1 — Create the Remote Logging Action
-
-Connect to your router via Winbox or SSH and run:
 
 ```routeros
 /system logging action
@@ -148,11 +180,15 @@ add name=loki-promtail \
     syslog-severity=auto
 ```
 
-> Replace `<SERVER_IP>` with your Ubuntu server's IP address.
+Replace `<SERVER_IP>` with your Ubuntu server's IP address.
 
-**Why `bsd-syslog=yes`?** — Promtail is configured for RFC3164 (BSD syslog). Without this flag, MikroTik sends a non-standard format that Promtail cannot parse.
-
-**Why port `1514`?** — Port 514 is the default but is often blocked. Our stack uses 1514 to avoid conflicts.
+| Parameter | Value | Why It Matters |
+|---|---|---|
+| `target=remote` | remote | Sends logs over the network |
+| `remote=<SERVER_IP>` | Your server IP | Where Promtail is listening |
+| `remote-port=1514` | **1514** | **Must match Docker port mapping — not the default 514** |
+| `bsd-syslog=yes` | **yes** | **Enables RFC3164 format — required for Promtail to parse it** |
+| `syslog-facility=local0` | local0 | Standard facility for network devices |
 
 ### Step 2 — Add Logging Rules
 
@@ -169,14 +205,17 @@ add action=loki-promtail topics=system
 add action=loki-promtail topics=account
 ```
 
-### Step 3 — Verify Router Configuration
+### Step 3 — Verify on the Router
 
 ```routeros
-# Confirm the action was created correctly
+# Confirm the action was created
 /system logging action print where name=loki-promtail
 
-# Confirm the rules exist
+# Confirm the rules are active
 /system logging print where action=loki-promtail
+
+# Watch live logs to confirm topics are firing
+/log print follow
 ```
 
 ---
@@ -185,15 +224,17 @@ add action=loki-promtail topics=account
 
 ### 1. Open Grafana
 
-Navigate to: **`http://<SERVER_IP>:3000`**
+```
+http://<SERVER_IP>:3000
+```
 
-Login: `admin` / `admin`
+Login: `admin` / `admin` *(change this after first login)*
 
-> ℹ️ Loki is **automatically provisioned** as a data source — no manual setup needed.
+> ✅ **Loki is auto-provisioned** — no manual data source setup required.
 
 ### 2. Go to Explore
 
-- Click **Explore** (compass icon in the left sidebar)
+- Click the **Explore** icon (🧭) in the left sidebar
 - Select **Loki** from the data source dropdown
 
 ### 3. Run a Test Query
@@ -202,114 +243,140 @@ Login: `admin` / `admin`
 {job="mikrotik_logs"}
 ```
 
-If logs appear → ✅ Everything is working!
-
-If logs don't appear → See [Troubleshooting](#troubleshooting-logs-not-arriving) below.
+Click **Run query**. If log lines appear → ✅ **Everything is working.**
 
 ---
 
 ## 🔍 Troubleshooting — Logs Not Arriving
 
-Work through these checks **in order**. Each step narrows down where the pipeline is broken.
+Work through these checks **in order**. Each step isolates exactly where the pipeline is broken.
 
-### Check 1 — Is the server firewall open?
+---
+
+### Check 1 — Are all containers running?
 
 ```bash
-# Check if port 1514 is open
-sudo ufw status
-# If UFW is active and 1514 is not listed:
+docker ps
+```
+
+All three (`loki`, `promtail`, `grafana`) must be `Up`. If any are `Exited`:
+```bash
+docker logs <container_name>
+```
+
+---
+
+### Check 2 — Is the server firewall open?
+
+```bash
+sudo ufw status | grep 1514
+```
+
+If port 1514 is not listed as `ALLOW`:
+```bash
 sudo ufw allow 1514/udp
 sudo ufw reload
 ```
 
-### Check 2 — Are packets actually arriving at the server?
+---
 
-Run this on the server **while the router is sending logs**:
+### Check 3 — Are UDP packets arriving at the server?
+
+Run this on the server **while MikroTik is active**:
 
 ```bash
 sudo tcpdump -i any udp port 1514 -n -vv
 ```
 
-- **Packets appear** → packets are arriving, problem is in Promtail/Loki → go to Check 3
-- **No packets** → network/firewall issue between router and server → check routing, firewall, and MikroTik config
+- ✅ **Packets appear** → Network path is fine → Check 4
+- ❌ **No packets** → Problem is between router and server (routing, firewall, wrong IP/port)
 
-### Check 3 — Is Promtail receiving and parsing logs?
+---
+
+### Check 4 — Is Promtail receiving and forwarding logs?
 
 ```bash
-# Watch Promtail logs in real time
 docker logs promtail -f
 ```
 
 Look for:
-- `msg="Listening on address"` → good, it's bound to the UDP port
-- `level=error` → a configuration or parsing error — read the message carefully
-- `msg="Entry sent"` → logs are being forwarded to Loki successfully
+- ✅ `msg="Listening on address" address=0.0.0.0:1514` → bound correctly
+- ✅ `msg="successfully sent"` → logs reaching Loki
+- ❌ `level=error` → read the message carefully for the fix
 
-Check the Promtail metrics page:
+Check Promtail metrics (non-zero = receiving logs):
 ```bash
-curl http://localhost:9080/metrics | grep syslog_messages_total
+curl -s http://localhost:9080/metrics | grep syslog_messages_total
 ```
 
-A non-zero counter here means Promtail is receiving logs.
+---
 
-### Check 4 — Is Loki receiving logs?
+### Check 5 — Has Loki received any logs?
 
 ```bash
-# Check Loki logs
+# Should list labels including "job" if logs have arrived
+curl -s http://localhost:3100/loki/api/v1/labels | python3 -m json.tool
+```
+
+Also check Loki logs:
+```bash
 docker logs loki -f
-
-# Query Loki directly via its API
-curl -G "http://localhost:3100/loki/api/v1/labels" | python3 -m json.tool
 ```
 
-If you see `job` in the labels list, Loki has received at least one log.
+---
 
-### Check 5 — Verify the MikroTik action has `bsd-syslog=yes`
+### Check 6 — Verify MikroTik action has the two critical flags
 
 ```routeros
 /system logging action print where name=loki-promtail
 ```
 
-Confirm the output shows `bsd-syslog: yes`. If not:
+Confirm these two values:
+- `bsd-syslog: yes` ← **If `no`, logs cannot be parsed**
+- `remote-port: 1514` ← **If `514`, logs go to the wrong port**
 
+Fix if needed:
 ```routeros
-/system logging action set [find name=loki-promtail] bsd-syslog=yes
+/system logging action set [find name=loki-promtail] bsd-syslog=yes remote-port=1514
 ```
 
-### Check 6 — Verify the correct port on MikroTik
+---
 
-```routeros
-/system logging action print where name=loki-promtail
-```
-
-Confirm `remote-port: 1514`. If it shows `514`, fix it:
-
-```routeros
-/system logging action set [find name=loki-promtail] remote-port=1514
-```
-
-### Check 7 — Restart the stack after config changes
+### Check 7 — Restart after any config changes
 
 ```bash
 docker compose down
 docker compose up -d
-# Wait 15 seconds then re-test
-sleep 15 && curl http://localhost:3100/ready
+sleep 15
+curl http://localhost:3100/ready
 ```
+
+---
+
+### Quick Diagnostic Summary Table
+
+| Symptom | Most Likely Cause | Fix |
+|---|---|---|
+| Container `loki` keeps restarting | Config file mount issue | Remove custom config mount, use built-in |
+| No packets in `tcpdump` | Firewall or wrong IP/port on router | Check UFW + MikroTik action `remote` and `remote-port` |
+| Packets arrive but nothing in Loki | `bsd-syslog=yes` missing | Set `bsd-syslog=yes` on MikroTik logging action |
+| Promtail `error` in logs | YAML indentation bug in config | Validate `promtail-config.yaml` with `docker run --rm -v $(pwd)/promtail-config.yaml:/etc/promtail/config.yml grafana/promtail:3.0.0 --config.file=/etc/promtail/config.yml --check-syntax` |
+| Grafana shows "Data source error" | Wrong Loki URL | Use `http://loki:3100` (Docker network name) |
 
 ---
 
 ## 🔌 MikroTik REST API Queries
 
-Query live router data directly from the command line using the included Python script.
+Query live data directly from your router using the included Python script.
+Requires **RouterOS v7.1+**.
 
-### Setup — Enable REST API on RouterOS (v7.1+ only)
+### Enable REST API on the Router
 
 ```routeros
-# Enable HTTP web service (REST API is automatic)
+# Enable HTTP web service (REST API activates automatically)
 /ip service set www disabled=no port=80
 
-# Create a read-only API user (recommended over using admin)
+# Create a read-only API user (do NOT use admin for this)
 /user group add name=api-readonly policy=read,api,rest-api
 /user add name=api-user group=api-readonly password=StrongPassword123
 ```
@@ -317,11 +384,15 @@ Query live router data directly from the command line using the included Python 
 ### Run the Query Script
 
 ```bash
-# Install the required Python library
+# Install the Python dependency
 pip install requests
 
-# Query your router
-python mikrotik_api_query.py --host <ROUTER_IP> --user api-user --password StrongPassword123 --no-ssl
+# Run — replace with your router's IP
+python mikrotik_api_query.py \
+    --host 192.168.88.1 \
+    --user api-user \
+    --password StrongPassword123 \
+    --no-ssl
 ```
 
 **Sample output:**
@@ -335,63 +406,81 @@ BGP Routes         : 15830
 ------------------------------
 ```
 
-### Available Queries
+### What the Script Queries
 
-| Metric | API Endpoint | Description |
+| Metric | REST Endpoint | Description |
 |---|---|---|
-| Running Interfaces | `/rest/interface?running=true` | Interfaces currently UP |
-| BGP Connections | `/rest/routing/bgp/connection` | Configured BGP peers |
-| BGP Routes | `/rest/routing/route?bgp=true` | Routes learned via BGP |
+| Running Interfaces | `GET /rest/interface?running=true` | Count of interfaces currently UP |
+| BGP Peers | `GET /rest/routing/bgp/connection` | Configured BGP sessions |
+| BGP Routes | `GET /rest/routing/route?bgp=true` | Routes learned via BGP |
 
 ---
 
 ## 📊 LogQL Query Reference
 
-Use these in **Grafana → Explore** with the Loki data source selected.
+Use these in **Grafana → Explore** with the Loki data source.
 
-### All MikroTik Logs
+### Basics
+
 ```logql
+# All MikroTik logs
 {job="mikrotik_logs"}
-```
 
-### BGP Session Events (Up/Down)
-```logql
-{job="mikrotik_logs"} |= "bgp" |~ "state changed|established|idle"
-```
+# Logs from a specific router by hostname
+{job="mikrotik_logs", host="router-core-01"}
 
-### Firewall Drops
-```logql
-{job="mikrotik_logs"} |= "firewall" |= "forward" |~ "drop|reject"
-```
-
-### Firewall Drops from a Specific IP
-```logql
-{job="mikrotik_logs"} |= "firewall" |= "192.168.1.100"
-```
-
-### Login / Authentication Events
-```logql
-{job="mikrotik_logs"} |= "account" |~ "logged in|login failure|logged out"
-```
-
-### Interface Up/Down Events
-```logql
-{job="mikrotik_logs"} |= "interface" |~ "link up|link down|changed"
-```
-
-### Errors & Warnings Only
-```logql
+# Errors and warnings only
 {job="mikrotik_logs", severity=~"err|warning|crit"}
 ```
 
-### Logs from a Specific Router
+### BGP
+
 ```logql
-{job="mikrotik_logs", host="router-core-01"}
+# BGP state changes (established, idle, up, down)
+{job="mikrotik_logs"} |= "bgp" |~ "state changed|established|idle"
+
+# BGP peer drops
+{job="mikrotik_logs"} |= "bgp" |= "idle"
 ```
 
-### Log Rate (Logs per Minute)
+### Firewall
+
 ```logql
+# All firewall drops
+{job="mikrotik_logs"} |= "firewall" |~ "drop|reject"
+
+# Drops involving a specific source IP
+{job="mikrotik_logs"} |= "firewall" |= "192.168.1.100"
+
+# Firewall actions on the forward chain
+{job="mikrotik_logs"} |= "forward" |= "drop"
+```
+
+### Authentication
+
+```logql
+# All login events (success + failure)
+{job="mikrotik_logs"} |= "account" |~ "logged in|login failure|logged out"
+
+# Failed logins only
+{job="mikrotik_logs"} |= "login failure"
+```
+
+### Interface Events
+
+```logql
+# Interface up/down events
+{job="mikrotik_logs"} |= "interface" |~ "link up|link down|changed"
+```
+
+### Rate Metrics
+
+```logql
+# Logs per minute (useful for traffic graphs)
 rate({job="mikrotik_logs"}[1m])
+
+# BGP events per hour
+rate({job="mikrotik_logs"} |= "bgp" [1h])
 ```
 
 > See `logql_queries.md` for more examples.
@@ -400,58 +489,122 @@ rate({job="mikrotik_logs"}[1m])
 
 ## 🤖 AI Troubleshooting Workflow
 
-When you see an issue in Grafana, use this workflow:
+When you spot an issue in Grafana, use this 4-step workflow:
 
-1. **Copy the relevant log lines** from Grafana Explore
-2. **Export your router config** for context:
-   ```routeros
-   /export file=config
-   ```
-3. **Paste both** into an AI assistant (ChatGPT, Claude, Gemini) using a prompt from `ai_troubleshooting_skills.md`
-4. Example prompt template:
-   ```
-   I am a network engineer managing MikroTik routers. Here are my recent logs:
-   
-   [PASTE LOGS]
-   
-   And my router config:
-   
-   [PASTE CONFIG]
-   
-   Please identify the root cause and suggest a fix.
-   ```
+**Step 1** — Copy the relevant log lines from Grafana Explore
 
-> See `ai_troubleshooting_skills.md` for topic-specific prompt templates (BGP, Firewall, Auth).
+**Step 2** — Export your router config:
+```routeros
+/export file=config
+# Then download from Files menu in Winbox
+```
+
+**Step 3** — Paste both into an AI assistant using a prompt template:
+
+```
+I am a network engineer managing MikroTik routers.
+
+Here are my recent logs from Grafana/Loki:
+[PASTE LOGS HERE]
+
+Here is my current router configuration:
+[PASTE CONFIG HERE]
+
+Please:
+1. Identify the root cause of the issue
+2. Explain why it's happening
+3. Provide the exact RouterOS commands to fix it
+```
+
+**Step 4** — See `ai_troubleshooting_skills.md` for topic-specific templates (BGP flapping, firewall drops, PPPoE auth failures).
 
 ---
 
 ## 🔒 Security
 
-- **Grafana**: Change the default `admin/admin` password immediately after first login
-- **Loki**: Not exposed to the internet — only accessible within the Docker network
-- **Syslog**: Consider IP-allowlisting port 1514 to only accept traffic from your router IPs:
-  ```bash
-  sudo ufw allow from <ROUTER_IP> to any port 1514 proto udp
-  sudo ufw deny 1514/udp
-  ```
-- **API User**: Never use the `admin` account for REST API access — use the `api-readonly` group
-- **Secrets**: Never commit real passwords or router configs to public repositories — see `.gitignore`
+| Area | Recommendation |
+|---|---|
+| Grafana password | Change `admin/admin` immediately after first login |
+| Syslog port | Restrict UDP/1514 to router IPs only: `sudo ufw allow from <ROUTER_IP> to any port 1514 proto udp` |
+| REST API user | Never use `admin` — use the `api-readonly` group |
+| Loki exposure | Do not expose port 3100 to the internet — it has no built-in auth |
+| Git hygiene | Never commit real passwords or router configs — check `.gitignore` |
 
 ---
 
 ## 🛣️ Roadmap
 
-- [ ] Pre-built Grafana dashboard JSON exports (BGP, Firewall, Auth)
-- [ ] Telegram/Slack alerting integration
-- [ ] Multi-router support with per-router dashboards
-- [ ] Automatic BGP flap detection alerts
-- [ ] PPPoE session tracking
+- [ ] Pre-built Grafana dashboard JSON exports (BGP, Firewall, Auth panels)
+- [ ] Telegram / Slack alerting integration
+- [ ] Multi-router per-device dashboards
+- [ ] Automatic BGP flap detection with alerting
+- [ ] PPPoE session tracking panel
+
+---
+
+## 🔀 Git — Push & Deploy
+
+### First time setup (from your local machine)
+
+```bash
+cd path/to/loki
+
+# Stage all updated files
+git add \
+  docker-compose.yml \
+  promtail-config.yaml \
+  grafana-provisioning/ \
+  mikrotik_setup.md \
+  mikrotik_api_query.py \
+  logql_queries.md \
+  ai_troubleshooting_skills.md \
+  run.sh \
+  README.md \
+  .gitignore
+
+# Commit
+git commit -m "fix: correct syslog pipeline, add REST API query script, update all docs"
+
+# Push
+git push origin main
+```
+
+### Pull and redeploy on the server
+
+```bash
+ssh root@<SERVER_IP>
+cd ~/Traubleshoot_mikroitk_with_AI
+
+git pull
+
+# Restart the stack to apply any config changes
+docker compose down
+docker compose up -d
+
+# Verify
+docker ps
+curl http://localhost:3100/ready
+```
+
+### What is committed vs ignored
+
+| File | Committed | Reason |
+|---|---|---|
+| `docker-compose.yml` | ✅ Yes | Core infrastructure definition |
+| `promtail-config.yaml` | ✅ Yes | Syslog parsing config |
+| `grafana-provisioning/` | ✅ Yes | Auto-provisions Loki in Grafana |
+| `mikrotik_api_query.py` | ✅ Yes | REST API query script |
+| `*.md` docs | ✅ Yes | Documentation |
+| `run.sh` | ✅ Yes | Startup script |
+| `loki-config.yaml` | ❌ No | Loki uses built-in default — not needed on server |
+| `mikrotik_config_export.txt` | ❌ No | **Contains sensitive router config** |
+| `loki-data/`, `grafana-data/` | ❌ No | Runtime Docker volumes — not needed in git |
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests are welcome. For major changes, open an issue first to discuss what you'd like to change.
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ---
 
