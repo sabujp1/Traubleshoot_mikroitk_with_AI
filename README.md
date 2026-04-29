@@ -73,9 +73,9 @@
 ├── grafana-provisioning/
 │   └── datasources/
 │       └── loki.yaml                     # Auto-provisions Loki data source in Grafana
-├── mikrotik_setup.md                     # RouterOS CLI commands (syslog + REST API)
-├── ai_cli.py                             # NEW: AI-style CLI for router status queries
-├── mikrotik_api_query.py                 # Core API library for MikroTik REST API
+├── mikrotik_explorer.py                 # Universal API explorer tool
+├── skill.md                             # AI "Instruction Manual" for the explorer
+├── mikrotik_api_query.py                # Core API library for MikroTik REST API
 ├── logql_queries.md                      # 30+ ready-to-use LogQL queries
 ├── ai_troubleshooting_skills.md          # 7 AI prompt templates for diagnostics
 ├── run.sh                                # One-command startup script with health check
@@ -395,7 +395,7 @@ This tool makes your router "discoverable" for any AI you run on your server!
 
 **Sample output:**
 ```
-Connecting to MikroTik router at 192.168.88.1...
+Connecting to MikroTik router at [ROUTER_IP]...
 
 --- MikroTik Router Status ---
 Running Interfaces : 6
