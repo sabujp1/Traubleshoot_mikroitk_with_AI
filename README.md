@@ -1,47 +1,221 @@
-# MikroTik Centralized Logging & AI Troubleshooting Stack
+# 🚀 MikroTik Centralized Logging & AI Troubleshooting Stack
 
-A modern DevOps pipeline for MikroTik routers using **Loki**, **Promtail**, and **Grafana**. This stack includes pre-configured Syslog parsing and AI-driven troubleshooting skills.
+A production-ready logging and troubleshooting platform for MikroTik networks using **Loki**, **Promtail**, and **Grafana**, enhanced with AI-assisted diagnostics.
 
-## 🚀 Features
-- **Centralized Logging**: Collect logs from multiple MikroTik routers via Syslog.
-- **Log Aggregation**: Powered by Grafana Loki for high-efficiency storage.
-- **Visualization**: Professional Grafana dashboards for monitoring BGP, Firewall, and System events.
-- **AI Investigation**: Built-in prompt templates to use with AI agents (like Claude/ChatGPT) for automated troubleshooting.
+This project helps network engineers **centralize logs, visualize events, and troubleshoot issues faster using AI workflows**.
 
-## 🛠️ Tech Stack
-- **Promtail**: Log collector & parser.
-- **Loki**: Log storage engine.
-- **Grafana**: Visualization & Alerting.
-- **Docker**: Containerized deployment.
+---
 
-## 📥 Getting Started
+## 📌 Overview
+
+Managing multiple MikroTik routers without centralized visibility is painful. This stack solves that by:
+
+* Collecting logs from routers via **Syslog**
+* Storing and indexing logs efficiently with **Loki**
+* Visualizing network events in **Grafana**
+* Using AI (ChatGPT/Claude) for faster root-cause analysis
+
+---
+
+## 🏗️ Architecture
+
+```text
+MikroTik Router(s)
+        │
+        ▼
+    Promtail
+        │
+        ▼
+      Loki
+        │
+        ▼
+     Grafana
+        │
+        ▼
+        AI (ChatGPT / Claude)
+```
+
+---
+
+## ⚡ Key Features
+
+* 📡 **Centralized Logging**
+  Aggregate logs from multiple MikroTik routers
+
+* 📊 **Real-time Visualization**
+  Monitor BGP, firewall, authentication, and system logs in Grafana
+
+* 🔍 **Powerful Log Search (LogQL)**
+  Quickly filter and analyze logs
+
+* 🤖 **AI-Powered Troubleshooting**
+  Use pre-built prompts to debug issues faster
+
+* 🐳 **Docker-based Deployment**
+  Easy setup and portability
+
+---
+
+## 🧰 Tech Stack
+
+* **Promtail** – Log collection & parsing
+* **Loki** – Log storage & indexing
+* **Grafana** – Visualization & alerting
+* **Docker Compose** – Deployment
+
+---
+
+## 🚀 Quick Start
 
 ### 1. Prerequisites
-- Ubuntu Server (or any Linux distro with Docker).
-- Docker & Docker Compose.
-- See [Ubuntu Installation Guide](ubuntu_installation.md) for details.
+
+* Linux server (Ubuntu recommended)
+* Docker & Docker Compose installed
+
+👉 See: `ubuntu_installation.md`
+
+---
 
 ### 2. Installation
-Clone this repository and run the setup script:
+
 ```bash
+git clone https://github.com/sabujp1/Traubleshoot_mikroitk_with_AI.git
+cd Traubleshoot_mikroitk_with_AI
+
 chmod +x run.sh
 ./run.sh
 ```
 
-### 3. MikroTik Configuration
-Follow the instructions in [mikrotik_setup.md](mikrotik_setup.md) to point your router logs to this server.
+---
 
-### 4. AI Troubleshooting
-Use the templates in [ai_troubleshooting_skills.md](ai_troubleshooting_skills.md) to analyze network issues. Paste your router config into `mikrotik_config_export.txt` for context-aware assistance.
+### 3. Configure MikroTik
 
-## 📊 Sample Queries
-Check out [logql_queries.md](logql_queries.md) for ready-to-use LogQL queries for:
-- BGP state changes.
-- Firewall drop monitoring.
-- User authentication audits.
+Follow:
 
-## 🔒 Security Note
-Never push your actual `mikrotik_config_export.txt` to a public repository. It is included in `.gitignore` by default.
+```
+mikrotik_setup.md
+```
+
+Example (Syslog config):
+
+```bash
+/system logging action add name=remote target=remote remote=YOUR_SERVER_IP
+/system logging add topics=info action=remote
+```
 
 ---
-Built with ❤️ for Network Engineers.
+
+### 4. Access Grafana
+
+```
+http://<your-server-ip>:3000
+```
+
+Default login:
+
+```
+admin / admin
+```
+
+---
+
+## 🤖 AI Troubleshooting Workflow
+
+1. Export MikroTik config:
+
+```bash
+/export file=config
+```
+
+2. Paste into:
+
+```
+mikrotik_config_export.txt
+```
+
+3. Use prompts from:
+
+```
+ai_troubleshooting_skills.md
+```
+
+4. Analyze issues using AI tools like ChatGPT or Claude
+
+---
+
+## 📊 Example Use Cases
+
+* 🔴 BGP session flapping detection
+* 🔥 Firewall drop analysis
+* 👤 PPPoE authentication issues
+* ⚠️ System instability troubleshooting
+
+---
+
+## 🔍 Sample LogQL Queries
+
+Check:
+
+```
+logql_queries.md
+```
+
+Includes:
+
+* BGP state monitoring
+* Login tracking
+* Firewall drops
+
+---
+
+## 📁 Project Structure
+
+```
+.
+├── docker-compose.yml
+├── promtail-config.yaml
+├── run.sh
+├── mikrotik_setup.md
+├── logql_queries.md
+├── ai_troubleshooting_skills.md
+└── ubuntu_installation.md
+```
+
+---
+
+## 🔒 Security Notes
+
+* Never upload real MikroTik configs to public repos
+* Sensitive files are excluded via `.gitignore`
+* Use private repos for production environments
+
+---
+
+## 🛣️ Roadmap
+
+* [ ] Pre-built Grafana dashboards export
+* [ ] Alerting integration (Slack/Telegram)
+* [ ] AI auto-analysis pipeline
+* [ ] Multi-tenant support
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, open an issue first.
+
+---
+
+## 📜 License
+
+Add a license (MIT recommended)
+
+---
+
+## ⭐ Support
+
+If this project helps, consider giving it a star ⭐
+
+---
+
+Built for network engineers who want **visibility + automation + intelligence** in one stack.
