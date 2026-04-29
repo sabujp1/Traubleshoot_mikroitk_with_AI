@@ -88,6 +88,101 @@ chmod +x run.sh
 
 ---
 
+## 🔗 Configure Loki Data Source in Grafana
+
+After starting the stack, you must connect Grafana to Loki.
+
+### 1. Open Grafana
+
+```bash
+http://<your-server-ip>:3000
+```
+
+Login:
+
+```
+admin / admin
+```
+
+---
+
+### 2. Navigate to Data Sources
+
+* Open menu (☰)
+* Go to **Connections → Data Sources**
+* Click **Add data source**
+
+---
+
+### 3. Select Loki
+
+* Search for **Loki**
+* Click the **Loki** data source
+
+---
+
+### 4. Configure Loki
+
+Set the following:
+
+```yaml
+Name: Loki
+URL: http://loki:3100
+```
+
+> If running outside Docker, use:
+
+```
+http://localhost:3100
+```
+
+---
+
+### 5. Save & Test
+
+Click:
+
+```
+Save & Test
+```
+
+Expected result:
+
+```
+Data source connected successfully
+```
+
+---
+
+## 🔍 Verify Logs
+
+Go to:
+
+```
+Explore → Select Loki
+```
+
+Try a basic query:
+
+```logql
+{job="mikrotik"}
+```
+
+If logs appear → everything is working ✅
+
+---
+
+## ⚠️ Common Issues
+
+* ❌ Wrong URL → use `loki:3100` (Docker network)
+* ❌ No logs → check Promtail config
+* ❌ Connection failed → verify containers are running:
+
+```bash
+docker ps
+```
+
+
 ### 3. Configure MikroTik
 
 Follow:

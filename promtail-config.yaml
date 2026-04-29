@@ -9,11 +9,12 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: mikrotik_syslog
+  - job_name: mikrotik
     syslog:
       listen_address: 0.0.0.0:1514
       idle_timeout: 60s
       label_structured_data: yes
+      format: rfc3164
       labels:
         job: "mikrotik_logs"
     relabel_configs:
@@ -21,29 +22,21 @@ scrape_configs:
         target_label: 'host'
       - source_labels: ['__syslog_message_app_name']
         target_label: 'module'
-      - source_labels: ['__syslog_message_severity']
-        target_label: 'level'
-      - source_labels: ['__syslog_message_facility']
-        target_label: 'facility'
 
     pipeline_stages:
+      - regex:
+          # This handles the "topic,topic message" format common in MikroTik
+          expression: '^(?P<tags>[^ ]+) (?P<content>.*)$'
+      - labels:
+          tags:
+      # Optional: Extract firewall actions if the tag is firewall
       - match:
-          selector: '{job="mikrotik_logs"}'
+          selector: '{tags=~".*firewall.*"}'
           stages:
             - regex:
-                # Example MikroTik Log: "ovpn,debug,pptp,info message content"
-                expression: '^(?P<tags>[^ ]+) (?P<content>.*)$'
+                expression: '(?P<action>drop|accept|reject) (?P<chain>input|forward|output) (?P<interface_in>[^ ]+) (?P<interface_out>[^ ]+) proto (?P<proto>[^ ]+), (?P<src_ip>[^:]+):(?P<src_port>\d+)->(?P<dst_ip>[^:]+):(?P<dst_port>\d+)'
             - labels:
-                tags:
-            # Further parsing for firewall logs if they have specific patterns
-            - match:
-                selector: '{tags=~".*firewall.*"}'
-                stages:
-                  - regex:
-                      expression: '(?P<action>drop|accept|reject) (?P<chain>input|forward|output) (?P<interface_in>[^ ]+) (?P<interface_out>[^ ]+) proto (?P<proto>[^ ]+), (?P<src_ip>[^:]+):(?P<src_port>\d+)->(?P<dst_ip>[^:]+):(?P<dst_port>\d+)'
-                  - labels:
-                      action:
-                      chain:
-                      src_ip:
-                      dst_ip:
+                action:
+                src_ip:
+                dst_ip:
                       proto:
